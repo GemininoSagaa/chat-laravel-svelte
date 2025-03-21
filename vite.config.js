@@ -10,6 +10,11 @@ export default defineConfig({
         }),
         svelte({
             // Opciones de Svelte aquí
+            compilerOptions: {
+                compatibility: {
+                    componentApi: 4
+                }
+            }
         }),
     ],
 });
