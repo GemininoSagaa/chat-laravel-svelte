@@ -18,69 +18,49 @@ const createAuthStore = () => {
         setLoading: (loading) => update(state => ({ ...state, loading })),
         setError: (error) => update(state => ({ ...state, error })),
         
-        // Inicializar la sesión y configurar listeners
         init: async () => {
-            update(state => ({ ...state, loading: true }));
-            
-            // Verificar si ya hay una sesión activa
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
-                const { user, error } = await getCurrentUser();
+            try {
+                console.log('Iniciando authStore...');
+                update(state => ({ ...state, loading: true }));
                 
-                if (!error && user) {
-                    update(state => ({
-                        ...state,
-                        user,
-                        session: data.session,
-                        loading: false
-                    }));
-                } else {
-                    update(state => ({
-                        ...state,
-                        user: null,
-                        session: null,
-                        loading: false
-                    }));
-                }
-            } else {
+                // Verificar si ya hay una sesión activa
+                const { data } = await supabase.auth.getSession();
+                console.log('Respuesta de sesión:', data);
+                
+                // Simplemente actualizar el estado con la sesión y marcar como no cargando
                 update(state => ({
                     ...state,
-                    user: null,
-                    session: null,
+                    session: data.session,
+                    user: data.session?.user || null,
                     loading: false
                 }));
-            }
-            
-            // Suscribirse a cambios de autenticación
-            const { data: authListener } = supabase.auth.onAuthStateChange(
-                async (event, session) => {
-                    if (event === 'SIGNED_IN' && session) {
-                        const { user, error } = await getCurrentUser();
+                
+                // Suscribirse a cambios de autenticación de manera simple
+                const { data: authListener } = supabase.auth.onAuthStateChange(
+                    (event, session) => {
+                        console.log('Evento de autenticación:', event);
                         
-                        if (!error && user) {
-                            update(state => ({
-                                ...state,
-                                user,
-                                session,
-                                loading: false
-                            }));
-                        }
-                    } else if (event === 'SIGNED_OUT') {
+                        // Actualiza directamente sin hacer más llamadas
                         update(state => ({
                             ...state,
-                            user: null,
-                            session: null,
+                            session: session,
+                            user: session?.user || null,
                             loading: false
                         }));
                     }
-                }
-            );
-            
-            return () => {
-                if (authListener && authListener.subscription) {
-                    authListener.subscription.unsubscribe();
-                }
-            };
+                );
+                
+                return () => {
+                    if (authListener && authListener.subscription) {
+                        authListener.subscription.unsubscribe();
+                    }
+                };
+            } catch (error) {
+                console.error('Error al inicializar authStore:', error);
+                // En caso de error, marcamos como no cargando para no bloquear la interfaz
+                update(state => ({ ...state, loading: false, error }));
+                return () => {};
+            }
         },
         
         // Limpiar el estado al cerrar sesión

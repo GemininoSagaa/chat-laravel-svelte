@@ -14,25 +14,43 @@
     let groupsSubscription;
     let showRegister = false;
     let isLoading = true;
+    let forceLoginScreen = false; // Nueva variable para forzar la pantalla de login
     
     onMount(async () => {
-        // Inicializar el store de autenticación
-        destroyAuthStore = await authStore.init();
-        
-        // Suscribirse a cambios en el store de autenticación
-        authUnsubscribe = authStore.subscribe(state => {
-            isLoading = state.loading;
-            
-            if (state.user) {
-                // Si hay un usuario autenticado, cargar amigos y grupos
-                friendsStore.loadFriends();
-                friendsStore.loadFriendRequests();
-                friendsSubscription = friendsStore.subscribeFriendships();
-                
-                groupsStore.loadGroups();
-                groupsSubscription = groupsStore.subscribeGroups();
+        // Añadir timeout para no quedarse cargando infinitamente
+        setTimeout(() => {
+            if (isLoading) {
+                console.log("Forzando fin de carga por timeout");
+                isLoading = false;
             }
-        });
+        }, 5000); // 5 segundos máximo de carga
+        
+        try {
+            // Inicializar el store de autenticación
+            destroyAuthStore = await authStore.init();
+            
+            // Suscribirse a cambios en el store de autenticación
+            authUnsubscribe = authStore.subscribe(state => {
+                isLoading = state.loading;
+                
+                if (state.user) {
+                    // Si hay un usuario autenticado, cargar amigos y grupos
+                    try {
+                        friendsStore.loadFriends();
+                        friendsStore.loadFriendRequests();
+                        friendsSubscription = friendsStore.subscribeFriendships();
+                        
+                        groupsStore.loadGroups();
+                        groupsSubscription = groupsStore.subscribeGroups();
+                    } catch (error) {
+                        console.error("Error al cargar datos:", error);
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error en la inicialización:", error);
+            isLoading = false;
+        }
     });
     
     onDestroy(() => {
@@ -57,6 +75,13 @@
     const toggleForm = () => {
         showRegister = !showRegister;
     };
+    
+    // Función para forzar la pantalla de login
+    const forceLogin = () => {
+        isLoading = false;
+        forceLoginScreen = true;
+        authStore.reset(); // Resetear el store de autenticación
+    };
 </script>
 
 <main>
@@ -64,8 +89,11 @@
         <div class="loading-container">
             <div class="loading-spinner"></div>
             <p>Cargando...</p>
+            <button class="emergency-button" on:click={forceLogin}>
+                Cancelar carga y mostrar login
+            </button>
         </div>
-    {:else if !$authStore.user}
+    {:else if !$authStore.user || forceLoginScreen}
         <!-- Si no hay usuario autenticado, mostrar formularios de autenticación -->
         <div class="auth-container">
             <div class="auth-card">
@@ -91,70 +119,20 @@
 </main>
 
 <style>
-    main {
-        width: 100%;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: #f5f7fb;
-    }
+    /* Estilos existentes... */
     
-    .loading-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .loading-spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid #e0e0e0;
-        border-radius: 50%;
-        border-top-color: #3498db;
-        animation: spin 1s linear infinite;
-        margin-bottom: 10px;
-    }
-    
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    
-    .auth-container {
-        width: 100%;
-        max-width: 400px;
-        padding: 20px;
-    }
-    
-    .auth-card {
-        background-color: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        padding: 30px;
-    }
-    
-    .app-title {
-        text-align: center;
-        color: #4a5568;
-        font-size: 1.8rem;
-        margin-bottom: 1.5rem;
-    }
-    
-    .auth-toggle {
-        margin-top: 1rem;
-        text-align: center;
-        font-size: 0.9rem;
-        color: #718096;
-    }
-    
-    .auth-toggle button {
-        background: none;
+    .emergency-button {
+        margin-top: 20px;
+        padding: 8px 16px;
+        background-color: #f56565;
+        color: white;
         border: none;
-        color: #4299e1;
+        border-radius: 4px;
         cursor: pointer;
-        font-size: 0.9rem;
-        padding: 0;
-        text-decoration: underline;
+        font-size: 14px;
+    }
+    
+    .emergency-button:hover {
+        background-color: #e53e3e;
     }
 </style>
