@@ -3,29 +3,43 @@ import { supabase } from './supabase';
 // Registro de usuario
 export const registerUser = async (email, password, userData) => {
     try {
+        console.log("Iniciando registro...");
+        
         // Registrar usuario en Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
             password,
         });
 
+        console.log("Resultado Auth:", authData, authError);
+        
         if (authError) throw authError;
 
         if (authData?.user) {
+            console.log("Usuario autenticado, creando perfil...");
+            
             // Insertar datos en la tabla 'users' (perfil)
-            const { error: profileError } = await supabase
+            const userProfile = {
+                id: authData.user.id,
+                email: email,
+                username: userData.username,
+                // No incluyas 'avatar_url' si no existe en tu esquema
+                status: 'online'
+            };
+            
+            console.log("Datos a insertar:", userProfile);
+            
+            const { data: profileData, error: profileError } = await supabase
                 .from('users')
-                .insert([
-                    {
-                        id: authData.user.id,
-                        email: email,
-                        username: userData.username,
-                        avatar_url: userData.avatar_url || null,
-                        status: 'online'
-                    }
-                ]);
+                .insert([userProfile])
+                .select(); // Añadir select para ver qué se devuelve
+            
+            console.log("Resultado perfil:", profileData, profileError);
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.error("Error al crear perfil:", profileError);
+                // No lanzamos el error para permitir continuar con la autenticación
+            }
         }
 
         return { data: authData, error: null };
